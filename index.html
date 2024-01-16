@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        overflow:hidden;
+        background: #363636;
+    }
+
+    canvas {
+        float:left;
+        width:512px;
+        height:512px;
+    }
+
+    textarea {
+        display:inline;
+        width:100%;
+        height:495px;
+        word-break:keep-all; 
+        background: #323232;
+        color: #FFFFFF;
+        padding: 8px;
+        outline: 0px;
+    }
+</style>
+</head>
+<body>
+<canvas id="canvas" width="726" height="726"></canvas>
+<form><textarea id="code" name="multiliner" spellcheck="false"><!-- https://css-tricks.com/creating-an-editable-textarea-that-supports-syntax-highlighted-code/ --></textarea></form>
+<script type="module">
+
+const adapter = await navigator.gpu.requestAdapter();
+const device = await adapter.requestDevice();
+const context = canvas.getContext("webgpu");
+const format = navigator.gpu.getPreferredCanvasFormat();
+context.configure({
+    device, 
+    format
+});
+
+document.getElementById("code").value = 
+`@vertex fn vertMain(@builtin(vertex_index) i: u32) -> 
+@builtin(position) vec4f 
+{
+    return vec4f(
+        array(vec2f(-1, 1),vec2f(-1,-1),
+            vec2f( 1,-1),vec2f(-1, 1),
+            vec2f( 1, 1),vec2f( 1,-1))[i],0,1);
+}
+
+@fragment fn fragMain(@builtin(position) coord: vec4<f32>) -> 
+@location(0) vec4f 
+{
+    let uv = coord.xy / 726;
+    return vec4f(uv.xy, 0.5, 1.0);
+}`
+
+document.getElementById("code").addEventListener('keydown', (e) => 
+{
+    if (e.key == 'Enter' && e.shiftKey)
+    {
+        render(device)
+        e.preventDefault()
+    }
+
+    if (e.key == 'Tab')
+    {
+        e.preventDefault()
+    }
+})
+
+function render (device)
+{
+    const code = document.getElementById("code").value;
+    const m = device.createShaderModule({ 
+        code 
+    });
+
+    const pipeline = device.createRenderPipeline({
+        layout:"auto", 
+        vertex:{
+            module:m, 
+            entryPoint:"vertMain"
+        },
+        fragment:{
+            module:m,
+            entryPoint:"fragMain",
+            targets:[{
+                format
+            }]
+        }
+    });
+    
+    const ce = device.createCommandEncoder();
+    
+    const colorAttachments = [{
+        view:context.getCurrentTexture().createView(),
+        loadOp:"clear",
+        storeOp:"store"
+    }];
+    
+    const pass = ce.beginRenderPass({colorAttachments});
+    pass.setPipeline(pipeline);    
+    pass.draw(6);
+    pass.end();
+    device.queue.submit([ce.finish()]);
+}
+
+render (device)
+
+</script>
+</body>
+</html>
