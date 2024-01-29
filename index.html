@@ -1,26 +1,12 @@
-<!DOCTYPE html>
-<html lang="en"><head>
-<style>
-    * {margin:0;padding:0;background:#363636;color:#FFFFFF;font-family:monospace;}
-    body {overflow:hidden;}
-    canvas {float:left;width:512px;height:512px;}
-    textarea {position:absolute;display:inline;width:100%;height:100%;word-break:keep-all;background:rgba(0.0,0.0,0.0,0.0);color:rgba(0.0,0.0,0.0,0.0);caret-color:#FFFFFF;padding:8px;outline:0px;z-index:1;font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overflow:scroll;white-space:nowrap;resize:none;}
-    #codeRenderer {position:absolute;width:100%;height:100%;padding:8px;outline:0px;z-index:0;overflow:auto;white-space:nowrap;}
-    p, pre {display:inline;font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overflow:auto;}
-    form {overflow:auto;}
-    .type {color:#FF00FF;}
-    .keyword {color:aquamarine;}
-    .builtin {color:#006eb7;}
-</style>
-</head>
-<body>
-<canvas id="canvas" width="726" height="726"></canvas>
-<form>
-    <textarea id="codeEditor" name="multiliner" spellcheck="false"></textarea>
-    <div id="codeRenderer"></div>
-</form>
-<script type="module">
-
+<!DOCTYPE html><html lang="en"><head><style>*{overflow:hidden;margin:0;padding:0;background:#363636;color:#FFFFFF;font-family:monospace;}body
+{overflow:hidden;}canvas{float:left;width:512px;height:512px;}textarea{position:absolute;display:inline;width:100%;height:100%;
+word-break:keep-all;background:rgba(0.0,0.0,0.0,0.0);color:rgba(0.0,0.0,0.0,0.0);caret-color:#FFFFFF;padding:8px;outline:0px;
+z-index:1;font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overflow:scroll;white-space:nowrap;resize:none;}#codeRenderer
+{position:absolute;width:100%;height:100%;padding:8px;outline:0px;z-index:0;overflow:auto;white-space:nowrap;}p,pre{display:inline;
+font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overflow:auto;}form{overflow:auto;}.type{color:#FF00FF;}.keyword{
+color:aquamarine;}.builtin{color:#006eb7;}.operator{color:#CCCCCC;}.specifiers{color:#AAAAAA;}</style></head><body>
+<canvas id="canvas" width="726" height="726"></canvas><form><textarea id="codeEditor" name="multiliner" spellcheck="false"></textarea>
+<div id="codeRenderer"></div></form><script type="module">
 ///////////////////////////////////////////////////////
 ////
 //// Code Editor
@@ -40,13 +26,19 @@ const defaultFragmentShaderCode =
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
-@fragment fn fragMain(@builtin(position) coord: vec4<f32>) -> 
+@fragment fn fragMain (@builtin(position) coord: vec4f) -> 
 @location(0) vec4f 
 {
     let uv = coord.xy / 726;
 
-
-    return vec4f(uv.xy, 0.0 + sin(uniforms.t), 1.0);
+    if (abs(uv.x - 0.5) > 0.45 || abs(uv.y - 0.5) > 0.45)
+    {
+        return vec4f(1.0, 1.0, 1.0, 1.0);
+    }
+    else
+    {
+        return vec4f(uv.xy, 1.0, 1.0);
+    }
 }`;
 
 const codeRenderer = document.getElementById("codeRenderer")
@@ -63,29 +55,43 @@ const updateEditor = (e) =>
         .replaceAll("\n", "\r\n") 
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
-        // Types
-        .replaceAll("vec4f", "<p class=\"type\">vec4f</p>")
-        .replaceAll("vec3f", "<p class=\"type\">vec3f</p>")
-        .replaceAll("vec2f", "<p class=\"type\">vec2f</p>")
-        .replaceAll("f32", "<p class=\"type\">f32</p>")
-        .replaceAll("u32", "<p class=\"type\">u32</p>")
-        .replaceAll("bool", "<p class=\"type\">bool</p>")
+        // Type s
+        .replaceAll("vec4f",  "<p class=\"type\">vec4f</p>")
+        .replaceAll("vec3f",  "<p class=\"type\">vec3f</p>")
+        .replaceAll("vec2f",  "<p class=\"type\">vec2f</p>")
+        .replaceAll("f32",    "<p class=\"type\">f32</p>")
+        .replaceAll("u32",    "<p class=\"type\">u32</p>")
+        .replaceAll("bool",   "<p class=\"type\">bool</p>")
         // Keywords
         .replaceAll("struct", "<p class=\"keyword\">struct</p>")
-        .replaceAll("fn", "<p class=\"keyword\">fn</p>")
-        .replaceAll("if ", "<p class=\"keyword\">if </p>")
-        .replaceAll("if(", "<p class=\"keyword\">if</p>(")
-        .replaceAll("else", "<p class=\"keyword\">else</p>")
-        .replaceAll("for ", "<p class=\"keyword\">for </p>")
-        .replaceAll("for(", "<p class=\"keyword\">for</p>(")
-        .replaceAll("let", "<p class=\"keyword\">let</p>")
-        .replaceAll("var", "<p class=\"keyword\">var</p>")
+        .replaceAll("fn",     "<p class=\"keyword\">fn</p>")
+        .replaceAll("if ",    "<p class=\"keyword\">if </p>")
+        .replaceAll("if(",    "<p class=\"keyword\">if</p>(")
+        .replaceAll("else",   "<p class=\"keyword\">else</p>")
+        .replaceAll("for ",   "<p class=\"keyword\">for </p>")
+        .replaceAll("for(",   "<p class=\"keyword\">for</p>(")
+        .replaceAll("let",    "<p class=\"keyword\">let</p>")
+        .replaceAll("var",    "<p class=\"keyword\">var</p>")
         .replaceAll("return", "<p class=\"keyword\">return</p>")
-        .replaceAll("const", "<p class=\"keyword\">const</p>")
+        .replaceAll("const",  "<p class=\"keyword\">const</p>")
         // Builtins
-        .replaceAll("pow", "<p class=\"builtin\">pow</p>")
-        .replaceAll("sin", "<p class=\"builtin\">sin</p>")
-        .replaceAll("cos", "<p class=\"builtin\">cos</p>")
+        .replaceAll("pow",    "<p class=\"builtin\">pow</p>")
+        .replaceAll("sin",    "<p class=\"builtin\">sin</p>")
+        .replaceAll("cos",    "<p class=\"builtin\">cos</p>")
+        .replaceAll("abs",    "<p class=\"builtin\">abs</p>")
+        .replaceAll("dot",    "<p class=\"builtin\">dot</p>")
+        .replaceAll("fract",  "<p class=\"builtin\">fract</p>")
+        .replaceAll("mix",  "<p class=\"builtin\">mix</p>")
+        // Operators
+        .replaceAll("||",  "<p class=\"operator\">||</p>")
+        // Specifiers
+        .replaceAll("@group", "<p class=\"specifiers\">@group</p>")
+        .replaceAll("@binding", "<p class=\"specifiers\">@binding</p>")
+        .replaceAll("@fragment", "<p class=\"specifiers\">@fragment</p>")
+        .replaceAll("@location", "<p class=\"specifiers\">@location</p>")
+        .replaceAll("@builtin", "<p class=\"specifiers\">@builtin</p>")
+
+
 
     codeRenderer.innerHTML = "<pre id=\"codeEditorPre\">" + syntaxHighlightedHTML + "</pre>";
 }
@@ -100,22 +106,26 @@ codeEditor.addEventListener('keyup', (e) =>
         render(device)
         e.preventDefault()
     }
-
-    if (e.key == 'Tab')
-    {
-        e.preventDefault()
-    }
 })
 
 codeEditor.addEventListener('keydown', updateEditor)
 codeEditor.addEventListener('keydown', updateScroll)
 codeEditor.addEventListener('keydown', (e) => 
 { 
-    updateEditor()
-    updateScroll()
     if (e.key == 'Enter' && e.shiftKey) 
     {
         e.preventDefault() 
+    }
+
+    if (e.key == 'Tab')
+    {
+        e.preventDefault()
+    }
+
+    if (e.key == 'r' && e.metaKey)
+    {
+        alert("save shader!")
+        e.preventDefault()
     }
 })
 
@@ -135,10 +145,14 @@ const format  = navigator.gpu.getPreferredCanvasFormat();
 
 var pipeline
 var bindgroup
+var uniforms
+
+var animate = false
+var frame = 0
 
 context.configure({ device, format });
 
-function compile (device)
+function compile ()
 {
     const code = defaultVertexShaderCode + codeEditor.value
     
@@ -160,30 +174,53 @@ function compile (device)
     });
 
     const usesUniforms = code.includes("uniforms.")
+
     if (usesUniforms)
     {
-        const uniformSize   = 4;
-        const uniformValues = new Float32Array([ new Date().getTime() ])
-        const uniformBuffer = device.createBuffer({
-            size: uniformSize,
+        const size   = 4;
+        const values = new Float32Array([ frame ])
+        uniforms = device.createBuffer({
+            size: size,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
 
         bindgroup = device.createBindGroup({
             layout: pipeline.getBindGroupLayout(0),
-            entries: [{ binding: 0, resource: { buffer: uniformBuffer }}],
+            entries: [{ binding: 0, resource: { buffer: uniforms }}],
         });
-        device.queue.writeBuffer(uniformBuffer, 0, uniformValues);
+        device.queue.writeBuffer(uniforms, 0, values);
+    }
+
+    const usesTime = code.includes("uniforms.t")
+    if (usesTime)
+    {
+        animate = true
     }
 }
 
-function render (device)
+function render ()
 {
     const colorAttachments = [{
         view:context.getCurrentTexture().createView(),
         loadOp:"clear",
         storeOp:"store"
     }];
+
+    if (animate)
+    {
+        const size   = 4;
+        const values = new Float32Array([ frame ])
+        uniforms = device.createBuffer({
+            size: size,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        bindgroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [{ binding: 0, resource: { buffer: uniforms }}],
+        });
+        device.queue.writeBuffer(uniforms, 0, values);
+    }
 
     const ce = device.createCommandEncoder();
     const pass = ce.beginRenderPass({colorAttachments});
@@ -192,11 +229,17 @@ function render (device)
     pass.draw(6);
     pass.end();
     device.queue.submit([ce.finish()]);
+
+    if (animate)
+    {
+        window.requestAnimationFrame(render)
+        ++frame
+    }
 }
 
 updateEditor ()
-compile(device)
-render (device)
+compile()
+render ()
 
 </script>
 </body>
