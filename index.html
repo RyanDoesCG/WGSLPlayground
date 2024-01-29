@@ -1,66 +1,102 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <style>
-    * {
-        margin: 0;
-        padding: 0;
-        overflow:hidden;
-        background: #363636;
-    }
-
-    canvas {
-        float:left;
-        width:512px;
-        height:512px;
-    }
-
-    textarea {
-        display:inline;
-        width:100%;
-        height:495px;
-        word-break:keep-all; 
-        background: #323232;
-        color: #FFFFFF;
-        padding: 8px;
-        outline: 0px;
-    }
+    * {margin:0;padding:0;background:#363636;color:#FFFFFF;font-family:monospace;}
+    body {overflow:hidden;}
+    canvas {float:left;width:512px;height:512px;}
+    textarea {position:absolute;display:inline;width:100%;height:100%;word-break:keep-all;background:rgba(0.0,0.0,0.0,0.0);color:rgba(0.0,0.0,0.0,0.0);caret-color:#FFFFFF;padding:8px;outline:0px;z-index:1;font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overflow:scroll;white-space:nowrap;resize:none;}
+    #codeRenderer {position:absolute;width:100%;height:100%;padding:8px;outline:0px;z-index:0;overflow:auto;white-space:nowrap;}
+    p, pre {display:inline;font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overflow:auto;}
+    form {overflow:auto;}
+    .type {color:#FF00FF;}
+    .keyword {color:aquamarine;}
+    .builtin {color:#006eb7;}
 </style>
 </head>
 <body>
 <canvas id="canvas" width="726" height="726"></canvas>
-<form><textarea id="code" name="multiliner" spellcheck="false"><!-- https://css-tricks.com/creating-an-editable-textarea-that-supports-syntax-highlighted-code/ --></textarea></form>
+<form>
+    <textarea id="codeEditor" name="multiliner" spellcheck="false"></textarea>
+    <div id="codeRenderer"></div>
+</form>
 <script type="module">
 
-const adapter = await navigator.gpu.requestAdapter();
-const device = await adapter.requestDevice();
-const context = canvas.getContext("webgpu");
-const format = navigator.gpu.getPreferredCanvasFormat();
-context.configure({
-    device, 
-    format
-});
-
-document.getElementById("code").value = 
+///////////////////////////////////////////////////////
+////
+//// Code Editor
+////
+///////////////////////////////////////////////////////
+const defaultVertexShaderCode = 
 `@vertex fn vertMain(@builtin(vertex_index) i: u32) -> 
 @builtin(position) vec4f 
-{
-    return vec4f(
-        array(vec2f(-1, 1),vec2f(-1,-1),
-            vec2f( 1,-1),vec2f(-1, 1),
-            vec2f( 1, 1),vec2f( 1,-1))[i],0,1);
-}
+{ 
+    return vec4f( array(vec2f(-1, 1),vec2f(-1,-1), vec2f( 1,-1),vec2f(-1, 1), vec2f( 1, 1),vec2f( 1,-1))[i],0,1);
+}`;
+
+const defaultFragmentShaderCode = 
+`struct Uniforms {
+    t: f32
+};
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
 @fragment fn fragMain(@builtin(position) coord: vec4<f32>) -> 
 @location(0) vec4f 
 {
     let uv = coord.xy / 726;
-    return vec4f(uv.xy, 0.5, 1.0);
-}`
 
-document.getElementById("code").addEventListener('keydown', (e) => 
+
+    return vec4f(uv.xy, 0.0 + sin(uniforms.t), 1.0);
+}`;
+
+const codeRenderer = document.getElementById("codeRenderer")
+const codeEditor   = document.getElementById("codeEditor")
+
+const updateScroll = () => 
+{
+    codeRenderer.scrollTop = codeEditor.scrollTop
+}
+
+const updateEditor = (e) =>
+{
+    const syntaxHighlightedHTML = codeEditor.value
+        .replaceAll("\n", "\r\n") 
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        // Types
+        .replaceAll("vec4f", "<p class=\"type\">vec4f</p>")
+        .replaceAll("vec3f", "<p class=\"type\">vec3f</p>")
+        .replaceAll("vec2f", "<p class=\"type\">vec2f</p>")
+        .replaceAll("f32", "<p class=\"type\">f32</p>")
+        .replaceAll("u32", "<p class=\"type\">u32</p>")
+        .replaceAll("bool", "<p class=\"type\">bool</p>")
+        // Keywords
+        .replaceAll("struct", "<p class=\"keyword\">struct</p>")
+        .replaceAll("fn", "<p class=\"keyword\">fn</p>")
+        .replaceAll("if ", "<p class=\"keyword\">if </p>")
+        .replaceAll("if(", "<p class=\"keyword\">if</p>(")
+        .replaceAll("else", "<p class=\"keyword\">else</p>")
+        .replaceAll("for ", "<p class=\"keyword\">for </p>")
+        .replaceAll("for(", "<p class=\"keyword\">for</p>(")
+        .replaceAll("let", "<p class=\"keyword\">let</p>")
+        .replaceAll("var", "<p class=\"keyword\">var</p>")
+        .replaceAll("return", "<p class=\"keyword\">return</p>")
+        .replaceAll("const", "<p class=\"keyword\">const</p>")
+        // Builtins
+        .replaceAll("pow", "<p class=\"builtin\">pow</p>")
+        .replaceAll("sin", "<p class=\"builtin\">sin</p>")
+        .replaceAll("cos", "<p class=\"builtin\">cos</p>")
+
+    codeRenderer.innerHTML = "<pre id=\"codeEditorPre\">" + syntaxHighlightedHTML + "</pre>";
+}
+
+codeEditor.addEventListener('keyup', updateEditor)
+codeEditor.addEventListener('keyup', updateScroll)
+codeEditor.addEventListener('keyup', (e) => 
 {
     if (e.key == 'Enter' && e.shiftKey)
     {
+        compile(device)
         render(device)
         e.preventDefault()
     }
@@ -71,15 +107,47 @@ document.getElementById("code").addEventListener('keydown', (e) =>
     }
 })
 
-function render (device)
+codeEditor.addEventListener('keydown', updateEditor)
+codeEditor.addEventListener('keydown', updateScroll)
+codeEditor.addEventListener('keydown', (e) => 
+{ 
+    updateEditor()
+    updateScroll()
+    if (e.key == 'Enter' && e.shiftKey) 
+    {
+        e.preventDefault() 
+    }
+})
+
+codeEditor.addEventListener('scroll', updateScroll)
+
+codeEditor.value = defaultFragmentShaderCode
+
+///////////////////////////////////////////////////////
+////
+//// WebGPU Renderer
+////
+///////////////////////////////////////////////////////
+const adapter = await navigator.gpu.requestAdapter();
+const device  = await adapter.requestDevice();
+const context = canvas.getContext("webgpu");
+const format  = navigator.gpu.getPreferredCanvasFormat();
+
+var pipeline
+var bindgroup
+
+context.configure({ device, format });
+
+function compile (device)
 {
-    const code = document.getElementById("code").value;
+    const code = defaultVertexShaderCode + codeEditor.value
+    
     const m = device.createShaderModule({ 
         code 
     });
 
-    const pipeline = device.createRenderPipeline({
-        layout:"auto", 
+    pipeline = device.createRenderPipeline({
+        layout:'auto', 
         vertex:{
             module:m, 
             entryPoint:"vertMain"
@@ -87,27 +155,47 @@ function render (device)
         fragment:{
             module:m,
             entryPoint:"fragMain",
-            targets:[{
-                format
-            }]
+            targets:[{format}]
         }
     });
-    
-    const ce = device.createCommandEncoder();
-    
+
+    const usesUniforms = code.includes("uniforms.")
+    if (usesUniforms)
+    {
+        const uniformSize   = 4;
+        const uniformValues = new Float32Array([ new Date().getTime() ])
+        const uniformBuffer = device.createBuffer({
+            size: uniformSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+        });
+
+        bindgroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [{ binding: 0, resource: { buffer: uniformBuffer }}],
+        });
+        device.queue.writeBuffer(uniformBuffer, 0, uniformValues);
+    }
+}
+
+function render (device)
+{
     const colorAttachments = [{
         view:context.getCurrentTexture().createView(),
         loadOp:"clear",
         storeOp:"store"
     }];
-    
+
+    const ce = device.createCommandEncoder();
     const pass = ce.beginRenderPass({colorAttachments});
     pass.setPipeline(pipeline);    
+    pass.setBindGroup(0, bindgroup);
     pass.draw(6);
     pass.end();
     device.queue.submit([ce.finish()]);
 }
 
+updateEditor ()
+compile(device)
 render (device)
 
 </script>
