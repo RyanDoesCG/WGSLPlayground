@@ -26,6 +26,31 @@ const defaultFragmentShaderCode =
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
+fn random (uv: vec2f) -> f32
+{
+    return fract(sin(dot(uv.xy, vec2f(12.9898,78.233))) * 43758.5453123);
+}
+
+fn noise (uv: vec2f) -> f32
+{
+    let a = random(floor(uv));
+    let b = random(floor(uv) + vec2f(1.0, 0.0));
+    let c = random(floor(uv) + vec2f(0.0, 1.0));
+    let d = random(floor(uv) + vec2f(1.0, 1.0));
+    let t = smoothstep(vec2f(0.0), vec2f(1.0), fract(uv));
+    return mix(a, b, t.x) +
+        (c - a) * t.y * (1.0 - t.x) +
+        (d - b) * t.x * t.y;
+}
+
+fn octaves (uv: vec2f) -> f32
+{
+    return ((noise(uv * 11.5234) * 0.24332) + (noise(uv * 8.28344) * 0.16453) + 
+            (noise(uv * 6.32423) * 0.23514) + (noise(uv * 2.65444) * 0.65435) + 
+            (noise(uv * 1.35425) * 0.96546)) * 0.5;
+}
+
+
 @fragment fn fragMain (@builtin(position) coord: vec4f) -> 
 @location(0) vec4f 
 {
@@ -81,6 +106,7 @@ const updateEditor = (e) =>
         .replaceAll("abs",    "<p class=\"builtin\">abs</p>")
         .replaceAll("dot",    "<p class=\"builtin\">dot</p>")
         .replaceAll("fract",  "<p class=\"builtin\">fract</p>")
+        .replaceAll("floor",  "<p class=\"builtin\">floor</p>")
         .replaceAll("mix",  "<p class=\"builtin\">mix</p>")
         // Operators
         .replaceAll("||",  "<p class=\"operator\">||</p>")
@@ -90,8 +116,6 @@ const updateEditor = (e) =>
         .replaceAll("@fragment", "<p class=\"specifiers\">@fragment</p>")
         .replaceAll("@location", "<p class=\"specifiers\">@location</p>")
         .replaceAll("@builtin", "<p class=\"specifiers\">@builtin</p>")
-
-
 
     codeRenderer.innerHTML = "<pre id=\"codeEditorPre\">" + syntaxHighlightedHTML + "</pre>";
 }
@@ -126,6 +150,23 @@ codeEditor.addEventListener('keydown', (e) =>
     {
         alert("save shader!")
         e.preventDefault()
+    }
+
+    if (e.key == 's' && e.metaKey)
+    {
+        e.preventDefault()
+
+        render()
+
+        var image = document.createElement('a');        
+        image.download = 'shader.png';
+        image.href = document.getElementById("canvas").toDataURL();
+        image.click();
+
+        var shader = document.createElement('a');
+        shader.download = "shader.wgsl";
+        shader.href =  URL.createObjectURL(new Blob([codeEditor.value], { type: 'text/plain' }));
+        shader.click();
     }
 })
 
