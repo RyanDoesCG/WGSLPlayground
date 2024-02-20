@@ -5,21 +5,46 @@ z-index:1;font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overfl
 {position:absolute;width:100%;height:100%;padding:8px;outline:0px;z-index:0;overflow:auto;white-space:nowrap;}p,pre{display:inline;
 font-size:10pt;font-family:monospace;line-height:1.5;tab-size:2;overflow:auto;}form{overflow:auto;}.type{color:#FF00FF;}.keyword{
 color:aquamarine;}.builtin{color:#006eb7;}.operator{color:#CCCCCC;}.specifiers{color:#AAAAAA;}</style></head><body>
-<canvas id="canvas" width="726" height="726"></canvas><form><textarea id="codeEditor" name="multiliner" spellcheck="false"></textarea>
+<canvas id="canvas" width="800" height="800"></canvas><form><textarea id="codeEditor" name="multiliner" spellcheck="false"></textarea>
 <div id="codeRenderer"></div></form><script type="module">
+///////////////////////////////////////////////////////
+////
+//// Persistence
+////
+///////////////////////////////////////////////////////
+function readValueFromCookie(key)
+{
+    var CookieRecord = document.cookie;
+    var IndividualCookies = CookieRecord.split(' ');
+    for (var i = 0; i < IndividualCookies.length; ++i)
+    {
+        if (IndividualCookies[i].includes(key))
+        {
+            const value = (IndividualCookies[i].split('=')[1]).replace(";", "")
+            return value
+        }
+    }
+    return null
+}
+
+function writeValueToCookie(key, value)
+{
+    document.cookie = key + "=" + value
+}
+
 ///////////////////////////////////////////////////////
 ////
 //// Code Editor
 ////
 ///////////////////////////////////////////////////////
-const defaultVertexShaderCode = 
+var defaultVertexShaderCode = 
 `@vertex fn vertMain(@builtin(vertex_index) i: u32) -> 
 @builtin(position) vec4f 
 { 
     return vec4f( array(vec2f(-1, 1),vec2f(-1,-1), vec2f( 1,-1),vec2f(-1, 1), vec2f( 1, 1),vec2f( 1,-1))[i],0,1);
 }`;
 
-const defaultFragmentShaderCode = 
+var defaultFragmentShaderCode = 
 `struct Uniforms {
     t: f32
 };
@@ -65,6 +90,12 @@ fn octaves (uv: vec2f) -> f32
         return vec4f(uv.xy, 1.0, 1.0);
     }
 }`;
+
+const lastCode = readValueFromCookie("playgroundCode")
+if (lastCode)
+{
+    defaultFragmentShaderCode = lastCode
+}
 
 const codeRenderer = document.getElementById("codeRenderer")
 const codeEditor   = document.getElementById("codeEditor")
@@ -118,6 +149,8 @@ const updateEditor = (e) =>
         .replaceAll("@builtin", "<p class=\"specifiers\">@builtin</p>")
 
     codeRenderer.innerHTML = "<pre id=\"codeEditorPre\">" + syntaxHighlightedHTML + "</pre>";
+
+    writeValueToCookie("playgroundCode", codeEditor.value)
 }
 
 codeEditor.addEventListener('keyup', updateEditor)
@@ -156,6 +189,12 @@ codeEditor.addEventListener('keydown', (e) =>
     {
         e.preventDefault()
 
+        if (e.shiftKey)
+        {
+            canvas.width = 4096
+            canvas.height = 4096
+        }
+
         render()
 
         var image = document.createElement('a');        
@@ -167,6 +206,9 @@ codeEditor.addEventListener('keydown', (e) =>
         shader.download = "shader.wgsl";
         shader.href =  URL.createObjectURL(new Blob([codeEditor.value], { type: 'text/plain' }));
         shader.click();
+
+        canvas.width = 800
+        canvas.height = 800
     }
 })
 
@@ -189,7 +231,7 @@ var bindgroup
 var uniforms
 
 var animate = false
-var frame = 0
+var frame = 0.0
 
 context.configure({ device, format });
 
@@ -218,8 +260,8 @@ function compile ()
 
     if (usesUniforms)
     {
-        const size   = 4;
-        const values = new Float32Array([ frame ])
+        const size   = 12;
+        const values = new Float32Array([ canvas.width, canvas.height, frame ])
         uniforms = device.createBuffer({
             size: size,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -239,8 +281,10 @@ function compile ()
     }
 }
 
-function render ()
+async function render ()
 {
+    const Start = Date.now()
+
     const colorAttachments = [{
         view:context.getCurrentTexture().createView(),
         loadOp:"clear",
@@ -249,8 +293,8 @@ function render ()
 
     if (animate)
     {
-        const size   = 4;
-        const values = new Float32Array([ frame ])
+        const size   = 12;
+        const values = new Float32Array([ canvas.width, canvas.height, frame ])
         uniforms = device.createBuffer({
             size: size,
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -271,10 +315,16 @@ function render ()
     pass.end();
     device.queue.submit([ce.finish()]);
 
+    const Stop = Date.now()
+    const D = Stop - Start
     if (animate)
     {
+        frame += 1.0;
+        if (D < 16)
+        {
+            await new Promise(r => setTimeout(r, 16 - D));
+        }
         window.requestAnimationFrame(render)
-        ++frame
     }
 }
 
