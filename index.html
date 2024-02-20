@@ -46,6 +46,8 @@ var defaultVertexShaderCode =
 
 var defaultFragmentShaderCode = 
 `struct Uniforms {
+    w: f32,
+    h: f32,
     t: f32
 };
 
@@ -79,7 +81,7 @@ fn octaves (uv: vec2f) -> f32
 @fragment fn fragMain (@builtin(position) coord: vec4f) -> 
 @location(0) vec4f 
 {
-    let uv = coord.xy / 726;
+    let uv = coord.xy / vec2(uniforms.w, uniforms.h);
 
     if (abs(uv.x - 0.5) > 0.45 || abs(uv.y - 0.5) > 0.45)
     {
